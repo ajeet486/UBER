@@ -291,3 +291,117 @@ curl -X POST http://localhost:3000/users/login \
 - controller: `controllers/user.controller.js`
 - service: `services/user.service.js`
 - model: `models/user.model.js`
+
+
+
+# Register Captain — POST /captains/register
+
+## Description
+
+Creates a new captain account. The endpoint validates input, hashes the password, stores the captain in the database, and returns a JWT token plus the created captain object (password is not returned).
+
+## Route
+
+`POST /captains/register`
+
+> Note: The routes file is `routes/captain.routes.js` so this route will be available where that router is mounted (commonly `/captains`).
+
+## Headers
+
+- `Content-Type: application/json`
+
+## Request Body (JSON example)
+
+```json
+{
+  "fullname": { "firstname": "Jane", "lastname": "Roe" },
+  "email": "jane.roe@example.com",
+  "password": "secret123",
+  "vehicle": {
+    "color": "red",
+    "plate": "ABC123",
+    "capacity": 4,
+    "vehicleType": "car"
+  }
+}
+```
+
+## Required Fields & Validation
+
+The route applies express-validator checks (see `routes/captain.routes.js`) and the Mongoose model enforces schema constraints (see `models/captain.model.js`). Key validations:
+
+- `fullname.firstname` (string) — required; minimum 3 characters.
+  - Validation message: "First name must be at least 3 characters long"
+- `fullname.lastname` (string) — optional; if provided, minimum 3 characters.
+- `email` (string) — required; must be a valid email.
+  - Route-level message: "Invalid email"
+  - Model-level match: Invalid email address pattern in the schema.
+- `password` (string) — required; minimum 6 characters.
+  - Validation message: "Password must be at least 6 characters long"
+- `vehicle.color` (string) — required; minimum 3 characters.
+- `vehicle.plate` (string) — required; minimum 3 characters; unique.
+- `vehicle.capacity` (integer) — required; minimum 1.
+- `vehicle.vehicleType` (string) — required.
+  - Important: There is a mismatch between the route validator and the model enum:
+    - Route validator allows: `car`, `bike`, `scooter` (see `routes/captain.routes.js`).
+    - Model enum allows: `car`, `auto`, `motorcycle` (see `models/captain.model.js`).
+  - Recommendation: Align the allowed `vehicleType` values in the route and the model to avoid server-side validation/saving errors.
+
+Notes:
+
+- The service layer (`services/captain.service.js`) expects the following fields when creating a captain: `firstname`, `email`, `password`, `color`, `plate`, `capacity`, and `vehicleType`. If any required field is missing the service throws an error.
+- Passwords are hashed server-side using `captainModel.hashPassword()` before saving.
+
+## Responses / Status Codes
+
+- `201 Created` — Success. Returns JSON with `token` (JWT) and the created `captain` object (password will not be present).
+
+Example success response:
+
+```json
+{
+  "token": "<jwt_token>",
+  "captain": {
+    "_id": "607f...",
+    "fullname": { "firstname": "Jane", "lastname": "Roe" },
+    "email": "jane.roe@example.com",
+    "vehicle": {
+      "color": "red",
+      "plate": "ABC123",
+      "capacity": 4,
+      "vehicleType": "car"
+    },
+    "socketId": null,
+    "status": "inactive"
+  }
+}
+```
+
+- `400 Bad Request` — Validation failed (express-validator) or captain with given email already exists (controller returns `400` with message: "Captain with this email already exists").
+- `500 Internal Server Error` — Unexpected server/database errors or model-level validation failures (e.g., enum mismatch).
+
+## Example cURL
+
+```bash
+curl -X POST http://localhost:3000/captains/register \
+  -H "Content-Type: application/json" \
+  -d '{"fullname":{"firstname":"Jane","lastname":"Roe"},"email":"jane.roe@example.com","password":"secret123","vehicle":{"color":"red","plate":"ABC123","capacity":4,"vehicleType":"car"}}'
+```
+
+## Security / Implementation Notes
+
+- Passwords are hashed with `bcrypt` via `captainModel.hashPassword()`.
+- JWT token is generated with `captain.generateAuthToken()` which uses `process.env.JWT_SECRET` and expires in 24 hours.
+- The `password` field in the schema has `select: false`, so responses do not include the hashed password.
+- Duplicate email is checked in the controller and returns `400` with a message; consider returning `409 Conflict` for duplicate resources for clearer semantics.
+
+## Login (placeholder)
+
+The `POST /login` route in `routes/captain.routes.js` is currently a stub which returns a static `200` response. Implement authentication logic (validate credentials, `comparePassword`, return token + captain) if intended for production use.
+
+## References
+
+- routes: [routes/captain.routes.js](routes/captain.routes.js)
+- controller: [controllers/captain.controller.js](controllers/captain.controller.js)
+- service: [services/captain.service.js](services/captain.service.js)
+- model: [models/captain.model.js](models/captain.model.js)
