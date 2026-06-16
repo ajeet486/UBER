@@ -380,7 +380,8 @@ Example success response:
 - `400 Bad Request` — Validation failed (express-validator) or captain with given email already exists (controller returns `400` with message: "Captain with this email already exists").
 - `500 Internal Server Error` — Unexpected server/database errors or model-level validation failures (e.g., enum mismatch).
 
-## Example cURL
+## Example cURL 
+
 
 ```bash
 curl -X POST http://localhost:3000/captains/register \
@@ -395,9 +396,164 @@ curl -X POST http://localhost:3000/captains/register \
 - The `password` field in the schema has `select: false`, so responses do not include the hashed password.
 - Duplicate email is checked in the controller and returns `400` with a message; consider returning `409 Conflict` for duplicate resources for clearer semantics.
 
-## Login (placeholder)
+## Login Captain — POST /captains/login
 
-The `POST /login` route in `routes/captain.routes.js` is currently a stub which returns a static `200` response. Implement authentication logic (validate credentials, `comparePassword`, return token + captain) if intended for production use.
+## Description
+
+Authenticates an existing captain. Validates input, compares the provided password with the stored hash, sets an HTTP-only `token` cookie, and returns a JWT token plus the authenticated `captain` object (password will not be present).
+
+## Route
+
+`POST /captains/login`
+
+## Headers
+
+- `Content-Type: application/json`
+
+## Request Body (JSON example)
+
+```json
+{
+  "email": "jane.roe@example.com",
+  "password": "secret123"
+}
+```
+
+## Required Fields & Validation
+
+- `email` (string) — required; must be a valid email.
+  - Validation message when invalid: "Invalid email"
+- `password` (string) — required; minimum 6 characters.
+  - Validation message: "Password must be at least 6 characters long"
+
+## Responses / Status Codes
+
+- `200 OK` — Success. Returns JSON with `token` (JWT) and the authenticated `captain` object (password will not be present). The response also sets an httpOnly cookie named `token`.
+- `400 Bad Request` — Validation failed (express-validator).
+- `401 Unauthorized` — Invalid credentials (email not found or password mismatch).
+- `500 Internal Server Error` — Unexpected server/database errors.
+
+Example success response:
+
+```json
+{
+  "token": "<jwt_token>",
+  "captain": {
+    "_id": "607f...",
+    "fullname": { "firstname": "Jane", "lastname": "Roe" },
+    "email": "jane.roe@example.com",
+    "vehicle": { "color": "red", "plate": "ABC123", "capacity": 4, "vehicleType": "car" },
+    "socketId": null,
+    "status": "inactive"
+  }
+}
+```
+
+## Example cURL
+
+```bash
+curl -i -X POST http://localhost:3000/captains/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane.roe@example.com","password":"secret123"}'
+```
+
+## Security / Implementation Notes
+
+- Password comparison is done with `bcrypt.compare()` via `captain.comparePassword()`.
+- JWT token is generated with `process.env.JWT_SECRET` and the server sets it as an httpOnly cookie for convenience.
+- Ensure appropriate error handling in `controllers/captain.controller.js` for authentication failures to return `401 Unauthorized`.
+
+---
+
+## Get Captain Profile — GET /captains/profile
+
+## Description
+
+Returns the authenticated captain's profile. Requires authentication via the `token` cookie or an `Authorization: Bearer <jwt>` header.
+
+## Route
+
+`GET /captains/profile`
+
+## Headers
+
+- `Authorization: Bearer <jwt_token>` (optional if cookie used)
+- `Cookie: token=<jwt_token>` (optional)
+
+## Request Body
+
+None.
+
+## Responses / Status Codes
+
+- `200 OK` — Success. Returns JSON: `{ captain: { ... } }` (password is not returned).
+- `401 Unauthorized` — Missing or invalid token.
+
+Example success response:
+
+```json
+{
+  "captain": {
+    "_id": "607f...",
+    "fullname": { "firstname": "Jane", "lastname": "Roe" },
+    "email": "jane.roe@example.com",
+    "vehicle": { "color": "red", "plate": "ABC123", "capacity": 4, "vehicleType": "car" },
+    "socketId": null,
+    "status": "inactive"
+  }
+}
+```
+
+## Example cURL
+
+```bash
+curl -i -X GET http://localhost:3000/captains/profile \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+---
+
+## Logout Captain — POST /captains/logout
+
+## Description
+
+Logs out the current captain. If the app stores the JWT in an httpOnly cookie named `token`, the server clears that cookie and (optionally) blacklists the token so it cannot be reused.
+
+## Route
+
+`POST /captains/logout`
+
+## Headers
+
+- `Authorization: Bearer <jwt_token>` or `Cookie: token=<jwt_token>` depending on how authentication is provided.
+
+## Request Body
+
+None.
+
+## Responses / Status Codes
+
+- `200 OK` — Success. Example: `{ "message": "Captain logged out successfully" }`.
+- `401 Unauthorized` — If the endpoint enforces authentication and token is missing/invalid.
+
+## Example cURL
+
+```bash
+curl -i -X POST http://localhost:3000/captains/logout \
+  -H "Cookie: token=<jwt_token>"
+```
+
+## Notes
+
+- Server-side logout clearing cookies only affects clients using cookies. For stateless JWTs stored client-side, the client should discard the token; to fully invalidate a JWT on the server you need a revocation strategy (token blacklist) — this project uses `blacklistTokenModel` for that purpose.
+
+## References
+
+- routes: `routes/captain.routes.js`
+- controller: `controllers/captain.controller.js`
+- middleware: `middlewares/auth.middleware.js`
+- model: `models/captain.model.js`
+
 
 ## References
 
@@ -405,3 +561,4 @@ The `POST /login` route in `routes/captain.routes.js` is currently a stub which 
 - controller: [controllers/captain.controller.js](controllers/captain.controller.js)
 - service: [services/captain.service.js](services/captain.service.js)
 - model: [models/captain.model.js](models/captain.model.js)
+dadd login 
