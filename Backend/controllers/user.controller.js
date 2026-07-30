@@ -55,10 +55,10 @@ module.exports.loginUser = async (req, res, next) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
-    console.log("user login");
+  
     const userObj = user.toObject();
     delete userObj.password;
-    return res.status(200).json({ token, user: userObj });
+    return res.status(201).json({ token, user: userObj });
   } catch (error) {
     next(error);
   }
